@@ -1,0 +1,923 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Piano con Jane · en vivo</title>
+<meta name="description" content="Ejercicios de piano que te escuchan por el micrófono y avanzan cuando sale.">
+<meta name="theme-color" content="#A3123A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Piano Jane">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-512.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap">
+<style>
+/* Una sola columna para el celu en el atril: teclado grande, pasos arriba, lo que escucho abajo. */
+:root {
+  --paper: #F6F7F9; --surface: #FFFFFF; --ink: #18202D; --muted: #5B6676; --line: #DCE1E8;
+  --felt: #A3123A; --felt-soft: #F6E3E8;      /* mano derecha y acento: el fieltro rojo del piano */
+  --lh: #1D6A86; --lh-soft: #DDEEF4;           /* mano izquierda */
+  --key-white: #FFFFFF; --key-black: #1B2130; --key-stroke: #9AA3B2;
+  --ok: #2D7A4E; --ok-soft: #DDF1E5; --no: #B0363A; --no-soft: #F7DEDF; --mid: #A66A12;
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+  --font-body: "Atkinson Hyperlegible", "Helvetica Neue", Arial, sans-serif;
+  --r: 12px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0F131A; --surface: #171D27; --ink: #E9ECF1; --muted: #9CA6B5; --line: #283244;
+    --felt: #EC5C82; --felt-soft: #3A1C27; --lh: #5DB8D9; --lh-soft: #16303B;
+    --key-white: #E6E9EE; --key-black: #070A0F; --key-stroke: #6B7586;
+    --ok: #5CC489; --ok-soft: #173326; --no: #F07A7D; --no-soft: #3D1A1C; --mid: #E2A64B;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font-body); font-size: 17px; line-height: 1.5;
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.wrap { max-width: 720px; margin: 0 auto; padding-block: 0 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--font-display); margin: 0; line-height: 1.15; text-wrap: balance; }
+h1 { font-size: 1.8rem; font-weight: 800; letter-spacing: -0.01em; }
+h2 { font-size: 1.25rem; font-weight: 800; }
+h3 { font-size: 1.05rem; font-weight: 600; }
+p { margin: 0; }
+.eyebrow { font-size: 0.76rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.muted { color: var(--muted); }
+.small { font-size: 0.88rem; }
+[hidden] { display: none !important; }
+button { font: inherit; color: inherit; }
+button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid var(--lh); outline-offset: 2px; }
+.view { display: grid; gap: 18px; padding-top: 18px; }
+header.top { display: grid; gap: 4px; padding-top: 6px; }
+.group { display: grid; gap: 10px; }
+.cards { display: grid; gap: 10px; }
+.card { display: grid; gap: 4px; text-align: left; width: 100%; padding: 14px 16px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r); cursor: pointer; }
+.card:active { transform: scale(0.995); }
+.card .row1 { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.card .row1 > span:first-child { min-width: 0; }
+.tag { font-size: 0.78rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.tag.rh { color: var(--felt); background: var(--felt-soft); }
+.tag.lh { color: var(--lh); background: var(--lh-soft); }
+.tag.both { color: var(--ink); background: var(--line); }
+.last { font-size: 0.85rem; color: var(--muted); }
+.links { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn { font-weight: 700; font-size: 1rem; padding: 12px 18px; border-radius: 999px; border: 1.5px solid var(--line);
+  background: transparent; cursor: pointer; min-height: 48px; }
+.btn.primary { background: var(--felt); border-color: var(--felt); color: #fff; }
+.btn.small { font-size: 0.9rem; padding: 8px 14px; min-height: 40px; }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.back { background: none; border: 0; color: var(--muted); font-weight: 700; padding: 8px 0; cursor: pointer; justify-self: start; }
+.note-jane { display: grid; gap: 4px; padding: 12px 14px; border-left: 4px solid var(--felt); background: var(--surface); border-radius: 0 var(--r) var(--r) 0; }
+.steps { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { font-size: 0.9rem; font-weight: 700; padding: 6px 10px; border-radius: 999px; border: 1.5px solid var(--line); color: var(--muted); font-variant-numeric: tabular-nums; }
+.chip.now { color: var(--ink); border-color: var(--ink); background: var(--surface); }
+.chip.done { color: var(--ok); border-color: var(--ok); background: var(--ok-soft); }
+.chip.skip { color: var(--mid); border-color: var(--mid); }
+.board { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 10px 10px; display: grid; gap: 12px; }
+.kb svg { display: block; width: 100%; height: auto; }
+.target { text-align: center; display: grid; gap: 2px; }
+.target .big { font-family: var(--font-display); font-weight: 800; font-size: 2.6rem; line-height: 1.05; }
+.target .sub { color: var(--muted); }
+.flash-ok .big { color: var(--ok); }
+.meter { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.meter i { display: block; height: 100%; width: 0%; background: var(--lh); transition: width 60ms linear; }
+.hear { display: flex; justify-content: space-between; gap: 10px; font-size: 0.9rem; color: var(--muted); }
+.hear b { color: var(--ink); }
+.controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.metro { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 10px 12px; border: 1px dashed var(--key-stroke); border-radius: var(--r); }
+.metro .bpm { font-family: var(--font-display); font-weight: 800; font-size: 1.4rem; min-width: 3.2ch; text-align: center; font-variant-numeric: tabular-nums; }
+.beats { display: flex; gap: 8px; margin-left: auto; }
+.beats i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--key-stroke); display: block; }
+.beats i.on { background: var(--lh); border-color: var(--lh); }
+.beats i.on.acc { background: var(--felt); border-color: var(--felt); }
+details { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 14px; }
+details summary { cursor: pointer; font-weight: 700; }
+details[open] summary { margin-bottom: 8px; }
+.range { display: grid; gap: 4px; }
+input[type="range"] { width: 100%; accent-color: var(--felt); }
+.stats { display: grid; gap: 8px; }
+.stat { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.stat:last-child { border-bottom: 0; }
+.stat > span:first-child { color: var(--muted); }
+.stat b { text-align: right; }
+.result-head { display: grid; gap: 6px; }
+.result-head .big { font-family: var(--font-display); font-weight: 800; font-size: 2.2rem; line-height: 1.1; }
+textarea.summary { width: 100%; min-height: 150px; font: 0.92rem/1.45 var(--font-body); color: var(--ink); background: var(--paper);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+.status { min-height: 1.4em; font-size: 0.9rem; color: var(--muted); }
+.error-box { padding: 12px 14px; border-radius: var(--r); background: var(--no-soft); color: var(--ink); border: 1px solid var(--no); }
+ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+.hist-row { display: grid; gap: 2px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.hist-row:last-child { border-bottom: 0; }
+.libre-now { text-align: center; display: grid; gap: 4px; }
+.libre-now .big { font-family: var(--font-display); font-weight: 800; font-size: 3rem; line-height: 1; min-height: 1.1em; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- INICIO -->
+  <section class="view" id="v-home">
+    <header class="top">
+      <span class="eyebrow">Piano con Jane · en vivo</span>
+      <h1>Tocá y te escucho</h1>
+      <p class="muted">Cada ejercicio te muestra qué tocar, te escucha por el micrófono y avanza cuando sale.</p>
+    </header>
+    <div class="note-jane">
+      <span class="eyebrow">Antes de arrancar</span>
+      <p>Apoyá el celu en el atril o a un metro del piano, sin funda que tape el micrófono. Sin pedal, y con la sala en silencio.</p>
+    </div>
+    <div id="home-groups" class="group"></div>
+    <div class="links">
+      <button class="btn small" id="go-libre" type="button">Probar el micrófono</button>
+      <button class="btn small" id="go-avance" type="button">Mi avance</button>
+    </div>
+    <p class="small muted">Lo que hacés queda guardado sólo en este celu. Al final de cada ejercicio podés copiar el resumen y pegárselo a Jane en el chat.</p>
+  </section>
+
+  <!-- EJERCICIO -->
+  <section class="view" id="v-ex" hidden>
+    <button class="back" type="button" data-back>← Ejercicios</button>
+    <header class="top">
+      <span class="eyebrow" id="ex-group"></span>
+      <h1 id="ex-title"></h1>
+      <p class="muted" id="ex-help"></p>
+    </header>
+    <div class="steps" id="ex-steps" aria-label="Pasos"></div>
+    <div class="board">
+      <div class="target" id="ex-target" aria-live="polite">
+        <span class="big" id="ex-big">—</span>
+        <span class="sub" id="ex-sub">Tocá «Empezar» y dejá que el micrófono escuche.</span>
+      </div>
+      <div class="kb" id="ex-kb"></div>
+      <div class="meter" aria-hidden="true"><i id="ex-meter"></i></div>
+      <div class="hear"><span>Escucho: <b id="ex-hear">—</b></span><span id="ex-count"></span></div>
+    </div>
+    <div class="metro" id="ex-metro" hidden>
+      <button class="btn small" type="button" id="m-down" aria-label="Más lento">−5</button>
+      <span class="bpm" id="m-bpm">60</span><span class="small muted">bpm</span>
+      <button class="btn small" type="button" id="m-up" aria-label="Más rápido">+5</button>
+      <button class="btn small" type="button" id="m-toggle">Metrónomo</button>
+      <div class="beats" aria-hidden="true"><i class="acc"></i><i></i><i></i><i></i></div>
+    </div>
+    <div class="controls">
+      <button class="btn primary" type="button" id="ex-start">Empezar</button>
+      <button class="btn" type="button" id="ex-skip" disabled>Saltar paso</button>
+    </div>
+    <p class="status" id="ex-status" aria-live="polite"></p>
+    <details>
+      <summary>Si no me escucha bien</summary>
+      <div class="range">
+        <label for="sens" class="small">Sensibilidad: <b id="sens-val">5</b> de 10</label>
+        <input type="range" id="sens" min="1" max="10" step="1" value="5">
+        <p class="small muted">Si no reacciona cuando tocás, subila. Si avanza sola o marca errores que no hiciste, bajala. Probala en «Probar el micrófono».</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- RESULTADO -->
+  <section class="view" id="v-res" hidden>
+    <button class="back" type="button" data-back>← Ejercicios</button>
+    <div class="result-head">
+      <span class="eyebrow" id="res-ex"></span>
+      <span class="big" id="res-big"></span>
+      <p class="muted" id="res-line"></p>
+    </div>
+    <div class="board stats" id="res-stats"></div>
+    <div class="group">
+      <h2>Para Jane</h2>
+      <textarea class="summary" id="res-summary" readonly></textarea>
+      <div class="controls">
+        <button class="btn primary" type="button" id="res-copy">Copiar resumen</button>
+        <button class="btn" type="button" id="res-again">Otra vez</button>
+      </div>
+      <p class="status" id="res-status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <!-- LIBRE -->
+  <section class="view" id="v-libre" hidden>
+    <button class="back" type="button" data-back>← Ejercicios</button>
+    <header class="top">
+      <span class="eyebrow">Modo libre</span>
+      <h1>¿Qué estoy tocando?</h1>
+      <p class="muted">Tocá notas sueltas y acordes para ver qué escucho. Sirve para ajustar la sensibilidad antes de un ejercicio.</p>
+    </header>
+    <div class="board">
+      <div class="libre-now">
+        <span class="eyebrow">Nota</span><span class="big" id="l-note">—</span>
+        <span class="eyebrow">Acorde</span><span class="big" id="l-chord" style="font-size:2rem">—</span>
+      </div>
+      <div class="kb" id="l-kb"></div>
+      <div class="meter" aria-hidden="true"><i id="l-meter"></i></div>
+    </div>
+    <div class="controls"><button class="btn primary" type="button" id="l-start">Escuchar</button></div>
+    <p class="status" id="l-status" aria-live="polite"></p>
+    <div class="range">
+      <label for="sens2" class="small">Sensibilidad: <b id="sens2-val">5</b> de 10</label>
+      <input type="range" id="sens2" min="1" max="10" step="1" value="5">
+    </div>
+  </section>
+
+  <!-- AVANCE -->
+  <section class="view" id="v-avance" hidden>
+    <button class="back" type="button" data-back>← Ejercicios</button>
+    <header class="top">
+      <span class="eyebrow">Mi avance</span>
+      <h1>Lo que ya sale</h1>
+      <p class="muted">Cuántas veces terminaste cada ejercicio y tu mejor vuelta. Sin rachas ni horas: lo que importa es que salga.</p>
+    </header>
+    <div class="board" id="av-list"></div>
+  </section>
+
+</div>
+<script>
+(function () {
+  "use strict";
+
+  // ---------- notas y acordes ----------
+  var NOMBRES = ["Do", "Do♯", "Re", "Mi♭", "Mi", "Fa", "Fa♯", "Sol", "La♭", "La", "Si♭", "Si"];
+  var NEGRAS = [1, 3, 6, 8, 10];
+  function esNegra(m) { return NEGRAS.indexOf(((m % 12) + 12) % 12) >= 0; }
+  function nombre(m) { return NOMBRES[((m % 12) + 12) % 12]; }
+  function nombreNota(m) { return m === 60 ? "Do central" : nombre(m); }
+  function nombreAcorde(raiz, cal) { return NOMBRES[raiz] + (cal === "m" ? " menor" : ""); }
+  function pcsAcorde(raiz, cal) { return [raiz, (raiz + (cal === "m" ? 3 : 4)) % 12, (raiz + 7) % 12]; }
+
+  // ---------- ejercicios (Temporada 1 de Piano con Jane) ----------
+  function A(raiz, cal, rh, lh, nom) { return { raiz: raiz, cal: cal, rh: rh, lh: lh || [], nombre: nom || nombreAcorde(raiz, cal) }; }
+  var DO = function (rh, lh) { return A(0, "M", rh, lh, "Do"); };
+  var SOL = function (rh, lh) { return A(7, "M", rh, lh, "Sol"); };
+  var LAM = function (rh, lh) { return A(9, "m", rh, lh, "La menor"); };
+  var FA = function (rh, lh) { return A(5, "M", rh, lh, "Fa"); };
+  var EX = [
+    { id: "cinco-der", grupo: "Calentamiento", titulo: "Cinco dedos · derecha", modo: "notas", mano: "rh",
+      ayuda: "Pulgar en el Do central. Subí hasta Sol y volvé, sin mirar las manos.",
+      pasos: [60, 62, 64, 65, 67, 65, 64, 62, 60] },
+    { id: "cinco-izq", grupo: "Calentamiento", titulo: "Cinco dedos · izquierda en espejo", modo: "notas", mano: "lh",
+      ayuda: "Pulgar izquierdo en el Do central. Bajá hasta Fa y volvé.",
+      pasos: [60, 59, 57, 55, 53, 55, 57, 59, 60] },
+    { id: "escala-do", grupo: "Técnica", titulo: "Escala de Do mayor", modo: "notas", mano: "rh",
+      ayuda: "Derecha, una octava subiendo y bajando, pasando el pulgar: 1-2-3-1-2-3-4-5.",
+      pasos: [60, 62, 64, 65, 67, 69, 71, 72, 71, 69, 67, 65, 64, 62, 60] },
+    { id: "escala-sol", grupo: "Técnica", titulo: "Escala de Sol mayor", modo: "notas", mano: "rh",
+      ayuda: "Igual que la de Do, desde Sol. La única negra es el Fa♯.",
+      pasos: [67, 69, 71, 72, 74, 76, 78, 79, 78, 76, 74, 72, 71, 69, 67] },
+    { id: "arpegio-izq", grupo: "Técnica", titulo: "Arpegio de la izquierda · 1-5-8", modo: "notas", mano: "lh",
+      ayuda: "Do-Sol-Do y de vuelta, cuatro veces, parejo. Es la base de las baladas.",
+      pasos: [48, 55, 60, 55, 48, 55, 60, 55, 48, 55, 60, 55, 48, 55, 60, 55, 48] },
+    { id: "arpegio-der", grupo: "Técnica", titulo: "Arpegio de la derecha", modo: "notas", mano: "rh",
+      ayuda: "Do-Mi-Sol-Do subiendo y bajando.",
+      pasos: [60, 64, 67, 72, 67, 64, 60] },
+    { id: "escalera", grupo: "Técnica", titulo: "La escalera · inversiones", modo: "acordes", mano: "rh",
+      ayuda: "Do, Fa y Sol en sus tres posiciones, subiendo. Yo verifico el acorde; la posición la cuidás vos mirando el dibujo.",
+      pasos: [DO([60, 64, 67]), DO([64, 67, 72]), DO([67, 72, 76]),
+              FA([53, 57, 60]), FA([57, 60, 65]), FA([60, 65, 69]),
+              SOL([55, 59, 62]), SOL([59, 62, 67]), SOL([62, 67, 71])] },
+    { id: "letitbe-der", grupo: "Canciones", titulo: "Let It Be · derecha sola", modo: "acordes", mano: "rh", pulso: true,
+      ayuda: "Estrofa: Do-Sol-La menor-Fa · Do-Sol-Fa-Do. Cuatro golpes por acorde, con el dedo quieto.",
+      pasos: [DO([60, 64, 67]), SOL([59, 62, 67]), LAM([60, 64, 69]), FA([60, 65, 69]),
+              DO([60, 64, 67]), SOL([59, 62, 67]), FA([60, 65, 69]), DO([60, 64, 67])] },
+    { id: "letitbe-dos", grupo: "Canciones", titulo: "Let It Be · dos manos", modo: "acordes", mano: "both", pulso: true,
+      ayuda: "La izquierda toca la nota que le da nombre al acorde en el primer golpe; la derecha, los cuatro golpes.",
+      pasos: [DO([60, 64, 67], [48]), SOL([59, 62, 67], [43]), LAM([60, 64, 69], [45]), FA([60, 65, 69], [41]),
+              DO([60, 64, 67], [48]), SOL([59, 62, 67], [43]), FA([60, 65, 69], [41]), DO([60, 64, 67], [48])] },
+    { id: "tan-solo", grupo: "Canciones", titulo: "Tan solo (Los Piojos)", modo: "acordes", mano: "both", pulso: true,
+      ayuda: "Sol-Fa-Do-Sol, dos vueltas, cuatro golpes por acorde. El mismo truco del dedo quieto, en otra tonalidad.",
+      pasos: [SOL([55, 59, 62], [43]), FA([53, 57, 60], [41]), DO([52, 55, 60], [48]), SOL([50, 55, 59], [43]),
+              SOL([55, 59, 62], [43]), FA([53, 57, 60], [41]), DO([52, 55, 60], [48]), SOL([50, 55, 59], [43])] }
+  ];
+  var MANO = { rh: ["derecha", "rh"], lh: ["izquierda", "lh"], both: ["dos manos", "both"] };
+
+  // ---------- guardado local ----------
+  var HKEY = "pcj-historial", SKEY = "pcj-sensibilidad";
+  function leerHist() { try { return JSON.parse(localStorage.getItem(HKEY) || "[]"); } catch (e) { return []; } }
+  function guardarHist(h) { try { localStorage.setItem(HKEY, JSON.stringify(h.slice(-300))); } catch (e) {} }
+  var sens = 5;
+  try { sens = parseInt(localStorage.getItem(SKEY), 10) || 5; } catch (e) {}
+
+  // ---------- utilidades de interfaz ----------
+  function $(id) { return document.getElementById(id); }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  var vistaActual = "home";
+  function mostrar(v) {
+    ["home", "ex", "res", "libre", "avance"].forEach(function (n) { $("v-" + n).hidden = n !== v; });
+    vistaActual = v;
+    window.scrollTo(0, 0);
+  }
+  function fmtSeg(s) { s = Math.round(s); var m = Math.floor(s / 60); return m + ":" + String(s % 60).padStart(2, "0"); }
+  function fmtNum(x, d) { return x.toFixed(d).replace(".", ","); }
+  function hace(iso) {
+    var d = new Date(iso), hoy = new Date();
+    var dias = Math.round((new Date(hoy.toDateString()) - new Date(d.toDateString())) / 86400000);
+    if (dias === 0) return "hoy"; if (dias === 1) return "ayer"; return "hace " + dias + " días";
+  }
+
+  // ---------- teclado ----------
+  function rangoDe(ex) {
+    var ns = [];
+    if (ex.modo === "notas") ns = ex.pasos.slice();
+    else ex.pasos.forEach(function (p) { ns = ns.concat(p.rh, p.lh); });
+    var lo = Math.min.apply(null, ns) - 1, hi = Math.max.apply(null, ns) + 1;
+    while (!(lo % 12 === 0 || lo % 12 === 5)) lo--;           // arranca en Do o Fa
+    while (!(hi % 12 === 4 || hi % 12 === 11)) hi++;          // termina en Mi o Si
+    return [lo, hi];
+  }
+  // dibuja: marcas = { midi: "rh"|"lh"|"rh-soft"|"lh-soft" }, oidas = [midi], error = midi|null
+  function teclado(cont, lo, hi, marcas, oidas, error, etiquetas) {
+    var W = 22, H = 104, BW = 13, BH = 64, x = 0, blancas = [], negras = [];
+    for (var m = lo; m <= hi; m++) {
+      if (esNegra(m)) negras.push({ m: m, x: x - BW / 2 }); else { blancas.push({ m: m, x: x }); x += W; }
+    }
+    var ancho = x;
+    var ns = "http://www.w3.org/2000/svg";
+    var svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "-1 -1 " + (ancho + 2) + " " + (H + 30));
+    svg.setAttribute("role", "img");
+    var desc = Object.keys(marcas).filter(function (k) { return marcas[k] === "rh" || marcas[k] === "lh"; }).map(function (k) { return nombre(+k); });
+    svg.setAttribute("aria-label", desc.length ? "Tocá " + desc.join(", ") : "Teclado");
+    function color(mm, negra) {
+      var t = marcas[mm];
+      if (t === "rh") return "var(--felt)";
+      if (t === "lh") return "var(--lh)";
+      if (t === "rh-soft") return "var(--felt-soft)";
+      if (t === "lh-soft") return "var(--lh-soft)";
+      return negra ? "var(--key-black)" : "var(--key-white)";
+    }
+    function rect(xx, yy, w, h, fill, stroke, sw, rx) {
+      var r = document.createElementNS(ns, "rect");
+      r.setAttribute("x", xx); r.setAttribute("y", yy); r.setAttribute("width", w); r.setAttribute("height", h);
+      r.setAttribute("rx", rx); r.setAttribute("fill", fill); r.setAttribute("stroke", stroke); r.setAttribute("stroke-width", sw);
+      svg.appendChild(r);
+    }
+    function punto(cx, cy, fill) {
+      var c = document.createElementNS(ns, "circle");
+      c.setAttribute("cx", cx); c.setAttribute("cy", cy); c.setAttribute("r", 5); c.setAttribute("fill", fill);
+      c.setAttribute("stroke", "var(--surface)"); c.setAttribute("stroke-width", 1.5);
+      svg.appendChild(c);
+    }
+    blancas.forEach(function (k) {
+      rect(k.x, 0, W, H, color(k.m, false), "var(--key-stroke)", 1, 3);
+      if (k.m === 60) rect(k.x + W / 2 - 4, H + 4, 8, 3, "var(--muted)", "none", 0, 1.5);
+    });
+    negras.forEach(function (k) { rect(k.x, 0, BW, BH, color(k.m, true), "var(--key-stroke)", 0.8, 2); });
+    function xCentro(mm) {
+      for (var i = 0; i < blancas.length; i++) if (blancas[i].m === mm) return [blancas[i].x + W / 2, H - 12];
+      for (var j = 0; j < negras.length; j++) if (negras[j].m === mm) return [negras[j].x + BW / 2, BH - 10];
+      return null;
+    }
+    (oidas || []).forEach(function (mm) { var p = xCentro(mm); if (p) punto(p[0], p[1], "var(--ok)"); });
+    if (error != null) { var pe = xCentro(error); if (pe) punto(pe[0], pe[1], "var(--no)"); }
+    (etiquetas || []).forEach(function (mm) {
+      var p = xCentro(mm); if (!p) return;
+      var t = document.createElementNS(ns, "text");
+      t.setAttribute("x", p[0]); t.setAttribute("y", H + 24); t.setAttribute("text-anchor", "middle");
+      t.setAttribute("font-size", "11"); t.setAttribute("font-weight", "700");
+      t.setAttribute("fill", "var(--ink)"); t.setAttribute("font-family", "Atkinson Hyperlegible, Arial, sans-serif");
+      t.textContent = nombre(mm);
+      svg.appendChild(t);
+    });
+    cont.innerHTML = "";
+    cont.appendChild(svg);
+  }
+
+  // ---------- audio: micrófono y análisis ----------
+  var Au = { ac: null, stream: null, an: null, td: null, fd: null, sr: 48000, listo: false };
+  function crearContexto() {
+    if (!Au.ac) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return false;
+      Au.ac = new AC();
+    }
+    if (Au.ac.state === "suspended") Au.ac.resume();
+    return true;
+  }
+  function abrirMicrofono() {
+    if (Au.listo) return Promise.resolve(true);
+    if (!crearContexto()) return Promise.reject(new Error("sin-audio"));
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return Promise.reject(new Error("sin-mic"));
+    return navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false })
+      .then(function (stream) {
+        Au.stream = stream;
+        Au.sr = Au.ac.sampleRate;
+        var src = Au.ac.createMediaStreamSource(stream);
+        Au.an = Au.ac.createAnalyser();
+        Au.an.fftSize = 16384;
+        Au.an.smoothingTimeConstant = 0;
+        src.connect(Au.an);
+        Au.td = new Float32Array(Au.an.fftSize);
+        Au.fd = new Float32Array(Au.an.frequencyBinCount);
+        Au.listo = true;
+        return true;
+      });
+  }
+
+  // YIN: la nota que más suena (para ejercicios de notas sueltas)
+  var yinD = null, yinC = null;
+  function yin(buf, inicio, sr) {
+    var W = 2048, tauMin = Math.floor(sr / 1100), tauMax = Math.min(Math.floor(sr / 60), buf.length - inicio - W - 1);
+    if (!yinD || yinD.length < tauMax + 1) { yinD = new Float32Array(tauMax + 1); yinC = new Float32Array(tauMax + 1); }
+    for (var tau = 1; tau <= tauMax; tau++) {
+      var s = 0;
+      for (var i = 0; i < W; i++) { var dlt = buf[inicio + i] - buf[inicio + i + tau]; s += dlt * dlt; }
+      yinD[tau] = s;
+    }
+    yinC[0] = 1; var acum = 0;
+    for (var t2 = 1; t2 <= tauMax; t2++) { acum += yinD[t2]; yinC[t2] = acum > 0 ? yinD[t2] * t2 / acum : 1; }
+    var umbral = 0.15, mejor = -1;
+    for (var t = tauMin; t <= tauMax; t++) {
+      if (yinC[t] < umbral) { while (t + 1 <= tauMax && yinC[t + 1] < yinC[t]) t++; mejor = t; break; }
+    }
+    if (mejor < 0) return null;
+    var x0 = yinC[mejor - 1], x1 = yinC[mejor], x2 = mejor + 1 <= tauMax ? yinC[mejor + 1] : x1;
+    var den = x0 + x2 - 2 * x1, fino = den !== 0 ? mejor + (x0 - x2) / (2 * den) : mejor;
+    var f = sr / fino;
+    return { midi: 69 + 12 * Math.log2(f / 440), conf: 1 - x1 };
+  }
+
+  // Croma: qué notas (sin octava) suenan, a partir de los picos del espectro entre 60 y 720 Hz
+  var TRIADAS = [];
+  for (var r0 = 0; r0 < 12; r0++) { TRIADAS.push({ raiz: r0, cal: "M", pcs: pcsAcorde(r0, "M") }); TRIADAS.push({ raiz: r0, cal: "m", pcs: pcsAcorde(r0, "m") }); }
+  function croma(fd, sr, nfft) {
+    var bin = sr / nfft, kmin = Math.ceil(60 / bin), kmax = Math.floor(720 / bin);
+    var ch = new Float32Array(12), picos = [], tot = 0, mags = [], k;
+    for (k = kmin; k <= kmax; k++) mags.push(fd[k]);
+    var orden = mags.slice().sort(function (a, b) { return a - b; });
+    var piso = orden[Math.floor(orden.length * 0.5)];            // mediana en dB
+    for (k = kmin + 1; k < kmax; k++) {
+      var a = fd[k - 1], b = fd[k], c = fd[k + 1];
+      if (b > a && b >= c && b > piso + 18) {
+        var den = a - 2 * b + c, p = den !== 0 ? 0.5 * (a - c) / den : 0;
+        var f = (k + p) * bin, midi = 69 + 12 * Math.log2(f / 440), mr = Math.round(midi);
+        if (Math.abs(midi - mr) > 0.38) continue;
+        var w = Math.pow(10, (b - piso) / 20);
+        var pc = ((mr % 12) + 12) % 12;
+        ch[pc] += w; tot += w;
+        picos.push({ midi: mr, w: w });
+      }
+    }
+    var mx = 0; for (var i = 0; i < 12; i++) if (ch[i] > mx) mx = ch[i];
+    var notas = [];
+    if (mx > 0) {
+      var pmx = 0; picos.forEach(function (q) { if (q.w > pmx) pmx = q.w; });
+      picos.forEach(function (q) { if (q.w >= pmx * 0.2 && notas.indexOf(q.midi) < 0) notas.push(q.midi); });
+    }
+    var puntajes = TRIADAS.map(function (t) {
+      if (!tot) return { t: t, exp: 0, pres: 0, score: 0 };
+      var s = ch[t.pcs[0]] + ch[t.pcs[1]] + ch[t.pcs[2]];
+      var pres = Math.min(ch[t.pcs[0]], ch[t.pcs[1]], ch[t.pcs[2]]) / mx;
+      var exp = s / tot;
+      return { t: t, exp: exp, pres: pres, score: exp * (0.5 + 0.5 * Math.min(1, pres / 0.25)) };
+    });
+    var mejor = puntajes.reduce(function (a2, b2) { return b2.score > a2.score ? b2 : a2; }, puntajes[0]);
+    return { ch: ch, tot: tot, notas: notas, puntajes: puntajes, mejor: mejor };
+  }
+  function puntajeDe(cr, raiz, cal) {
+    for (var i = 0; i < cr.puntajes.length; i++) { var p = cr.puntajes[i]; if (p.t.raiz === raiz && p.t.cal === cal) return p; }
+    return null;
+  }
+
+  // sensibilidad → umbrales
+  function umbrales() {
+    return {
+      rms: Math.max(0.03 * Math.pow(0.68, sens - 1), ruido * 3),
+      exp: 0.70 - (sens - 1) * 0.03,
+      conf: 0.80
+    };
+  }
+
+  // ---------- metrónomo (visual siempre; sonido opcional) ----------
+  var Met = { on: false, bpm: 60, prox: 0, golpe: 0, timer: null, clicks: [], cola: [] };
+  function metroClick(t, acento) {
+    var o = Au.ac.createOscillator(), g = Au.ac.createGain();
+    o.frequency.value = acento ? 3520 : 2960;               // agudo, lejos de las notas que escucho
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(acento ? 0.6 : 0.4, t + 0.002);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+    o.connect(g); g.connect(Au.ac.destination); o.start(t); o.stop(t + 0.04);
+  }
+  function metroProgramar() {
+    while (Met.prox < Au.ac.currentTime + 0.12) {
+      metroClick(Met.prox, Met.golpe % 4 === 0);
+      Met.clicks.push(Met.prox); Met.cola.push({ t: Met.prox, b: Met.golpe % 4 });
+      Met.prox += 60 / Met.bpm; Met.golpe++;
+    }
+    var ahora = Au.ac.currentTime;
+    while (Met.clicks.length && Met.clicks[0] < ahora - 1) Met.clicks.shift();
+    var dots = document.querySelectorAll("#ex-metro .beats i");
+    while (Met.cola.length && Met.cola[0].t <= ahora) {
+      var q = Met.cola.shift();
+      for (var i = 0; i < dots.length; i++) dots[i].classList.toggle("on", i === q.b);
+    }
+  }
+  function metroEncender() {
+    if (!crearContexto()) return;
+    Met.on = true; Met.golpe = 0; Met.cola = []; Met.prox = Au.ac.currentTime + 0.1;
+    Met.timer = setInterval(metroProgramar, 25); metroProgramar();
+    $("m-toggle").textContent = "Parar metrónomo";
+  }
+  function metroApagar() {
+    Met.on = false; clearInterval(Met.timer); Met.cola = [];
+    document.querySelectorAll("#ex-metro .beats i").forEach(function (d) { d.classList.remove("on"); });
+    $("m-toggle").textContent = "Metrónomo";
+  }
+  function cercaDeClick(t) {
+    for (var i = 0; i < Met.clicks.length; i++) { var d = t - Met.clicks[i]; if (d > -0.02 && d < 0.12) return true; }
+    return false;
+  }
+
+  // ---------- bucle de escucha ----------
+  var ruido = 0, histRms = [], ultimoAtaque = -1, bucle = null;
+  var Esc = { activo: false, modo: null };   // quién está usando el micrófono: "ex" | "libre"
+  function analizar() {
+    Au.an.getFloatTimeDomainData(Au.td);
+    var n = Au.td.length, s = 0;
+    for (var i = n - 1024; i < n; i++) s += Au.td[i] * Au.td[i];
+    var rms = Math.sqrt(s / 1024);
+    var ahora = Au.ac.currentTime;
+    var u = umbrales();
+    var minRec = histRms.length ? Math.min.apply(null, histRms.slice(-5)) : rms;
+    var prevRms = histRms.length ? histRms[histRms.length - 1] : rms;
+    var ataque = rms > u.rms && rms > minRec * 1.35 && rms > prevRms * 1.2 && (ahora - ultimoAtaque) > 0.15 && !cercaDeClick(ahora);
+    if (ataque) ultimoAtaque = ahora;
+    histRms.push(rms); if (histRms.length > 12) histRms.shift();
+    var res = { rms: rms, ataque: ataque, ahora: ahora, nota: null, cr: null, fuerte: rms > u.rms };
+    if (res.fuerte && !cercaDeClick(ahora)) {
+      var y = yin(Au.td, n - 4096, Au.sr);
+      if (y && y.conf >= u.conf && y.midi > 30 && y.midi < 100) res.nota = y;
+      Au.an.getFloatFrequencyData(Au.fd);
+      res.cr = croma(Au.fd, Au.sr, Au.an.fftSize);
+    }
+    return res;
+  }
+  function arrancarBucle() {
+    if (bucle) return;
+    bucle = setInterval(function () {
+      if (!Au.listo || document.hidden) return;
+      var a = analizar();
+      var pct = Math.min(100, Math.round(Math.sqrt(a.rms / 0.2) * 100));
+      if (Esc.modo === "ex") { $("ex-meter").style.width = pct + "%"; pasoEjercicio(a); }
+      else if (Esc.modo === "libre") { $("l-meter").style.width = pct + "%"; pasoLibre(a); }
+    }, 45);
+  }
+  function calibrar(cb) {
+    var muestras = [], t0 = Date.now();
+    var iv = setInterval(function () {
+      Au.an.getFloatTimeDomainData(Au.td);
+      var s = 0, n = Au.td.length; for (var i = n - 1024; i < n; i++) s += Au.td[i] * Au.td[i];
+      muestras.push(Math.sqrt(s / 1024));
+      if (Date.now() - t0 > 900) {
+        clearInterval(iv);
+        muestras.sort(function (a, b) { return a - b; });
+        ruido = muestras[Math.floor(muestras.length * 0.6)] || 0;
+        cb();
+      }
+    }, 45);
+  }
+  function errorMic(e, statusId) {
+    var msg = "No pude abrir el micrófono.";
+    if (e && (e.name === "NotAllowedError" || e.name === "SecurityError")) msg = "El micrófono quedó bloqueado. En el iPhone: Ajustes → Safari → Micrófono → Permitir, y volvé a abrir la página.";
+    else if (e && e.message === "sin-mic") msg = "Este navegador no deja usar el micrófono. Abrila en Safari o Chrome.";
+    $(statusId).innerHTML = "";
+    $(statusId).appendChild(el("span", "error-box", msg));
+  }
+
+  // ---------- ejercicio ----------
+  var R = null;   // la corrida actual
+  function abrirEjercicio(ex) {
+    detenerCorrida();
+    R = { ex: ex, paso: 0, tiempos: [], errores: 0, errPaso: {}, saltos: [], inicio: 0, activo: false,
+          estable: 0, cand: null, okFr: 0, ataqueDesdePaso: false, ataquePend: null, errNota: null, errHasta: 0, oidas: [],
+          ultimoAvance: -1, errPc: null, errT: -10 };
+    $("ex-group").textContent = ex.grupo + " · " + MANO[ex.mano][0];
+    $("ex-title").textContent = ex.titulo;
+    $("ex-help").textContent = ex.ayuda;
+    $("ex-metro").hidden = !ex.pulso;
+    $("ex-start").textContent = "Empezar";
+    $("ex-skip").disabled = true;
+    $("ex-status").textContent = "";
+    $("ex-hear").textContent = "—";
+    $("ex-count").textContent = "";
+    pintarPasos(); pintarObjetivo();
+    $("ex-big").textContent = R.ex.modo === "notas" ? nombreNota(R.ex.pasos[0]) : R.ex.pasos[0].nombre;
+    $("ex-sub").textContent = "Tocá «Empezar» y dejá que el micrófono escuche.";
+    mostrar("ex");
+  }
+  function etiquetaPaso(p) { return R.ex.modo === "notas" ? nombre(p) : p.nombre; }
+  function pintarPasos() {
+    var box = $("ex-steps"); box.innerHTML = "";
+    R.ex.pasos.forEach(function (p, i) {
+      var c = el("span", "chip", etiquetaPaso(p));
+      if (i < R.paso) c.classList.add(R.saltos.indexOf(i) >= 0 ? "skip" : "done");
+      else if (i === R.paso) c.classList.add("now");
+      box.appendChild(c);
+    });
+  }
+  function pintarObjetivo() {
+    var rg = rangoDe(R.ex), marcas = {}, etiquetas = [];
+    var fin = R.paso >= R.ex.pasos.length;
+    if (!fin) {
+      var p = R.ex.pasos[R.paso];
+      if (R.ex.modo === "notas") { marcas[p] = R.ex.mano === "lh" ? "lh" : "rh"; etiquetas = [p]; }
+      else {
+        p.rh.forEach(function (m) { marcas[m] = "rh"; });
+        p.lh.forEach(function (m) { marcas[m] = "lh"; });
+        etiquetas = p.rh.concat(p.lh);
+      }
+      // el paso siguiente, suave, para que la mano se prepare
+      var sig = R.ex.pasos[R.paso + 1];
+      if (sig != null) {
+        if (R.ex.modo === "notas") { if (!marcas[sig]) marcas[sig] = (R.ex.mano === "lh" ? "lh" : "rh") + "-soft"; }
+        else { sig.rh.forEach(function (m) { if (!marcas[m]) marcas[m] = "rh-soft"; }); sig.lh.forEach(function (m) { if (!marcas[m]) marcas[m] = "lh-soft"; }); }
+      }
+    }
+    var err = R.errHasta > (Au.ac ? Au.ac.currentTime : 0) ? R.errNota : null;
+    teclado($("ex-kb"), rg[0], rg[1], marcas, R.oidas, err, etiquetas);
+  }
+  function empezarCorrida() {
+    var ex = R.ex;
+    if (!crearContexto()) { errorMic(new Error("sin-audio"), "ex-status"); return; }
+    $("ex-status").textContent = "Pidiendo el micrófono…";
+    abrirMicrofono().then(function () {
+      $("ex-status").textContent = "Un segundo en silencio: estoy midiendo el ruido de la sala…";
+      $("ex-start").disabled = true;
+      calibrar(function () {
+        abrirEjercicio(ex);                    // limpia la corrida
+        R.activo = true; R.inicio = Au.ac.currentTime;
+        Esc.modo = "ex"; arrancarBucle(); pedirPantalla();
+        $("ex-start").disabled = false; $("ex-start").textContent = "Reiniciar";
+        $("ex-skip").disabled = false;
+        $("ex-status").textContent = "Te escucho. Tocá cuando quieras.";
+        mostrarObjetivoTexto();
+      });
+    }).catch(function (e) { errorMic(e, "ex-status"); });
+  }
+  function mostrarObjetivoTexto() {
+    var p = R.ex.pasos[R.paso];
+    if (R.ex.modo === "notas") {
+      $("ex-big").textContent = nombreNota(p);
+      $("ex-sub").textContent = "Paso " + (R.paso + 1) + " de " + R.ex.pasos.length + " · mano " + MANO[R.ex.mano][0];
+    } else {
+      $("ex-big").textContent = p.nombre;
+      var txt = p.rh.map(nombre).join("-");
+      if (p.lh.length) txt += " · izq. " + p.lh.map(nombre).join("-");
+      $("ex-sub").textContent = txt + " · paso " + (R.paso + 1) + " de " + R.ex.pasos.length;
+    }
+  }
+  function detenerCorrida() {
+    if (R) R.activo = false;
+    if (Esc.modo === "ex") Esc.modo = null;
+    if (Met.on) metroApagar();
+    soltarPantalla();
+  }
+  function avanzar(saltado) {
+    R.tiempos.push(Au.ac.currentTime - R.inicio);
+    R.ultimoAvance = Au.ac.currentTime;
+    if (saltado) R.saltos.push(R.paso);
+    R.paso++; R.estable = 0; R.okFr = 0; R.cand = null; R.ataqueDesdePaso = false; R.ataquePend = null;
+    pintarPasos();
+    if (R.paso >= R.ex.pasos.length) { terminar(true); return; }
+    $("ex-target").classList.add("flash-ok");
+    setTimeout(function () { $("ex-target").classList.remove("flash-ok"); }, 250);
+    mostrarObjetivoTexto();
+    pintarObjetivo();
+  }
+  function marcarError(midiErr, pc) {
+    var ahora = Au.ac.currentTime;
+    if (pc === R.errPc && ahora - R.errT < 2.5) return;      // la misma nota equivocada sonando todavía
+    R.errPc = pc; R.errT = ahora;
+    R.errores++;
+    R.errPaso[R.paso] = (R.errPaso[R.paso] || 0) + 1;
+    R.errNota = midiErr; R.errHasta = Au.ac.currentTime + 0.5;
+    $("ex-count").textContent = R.errores === 1 ? "1 error" : R.errores + " errores";
+  }
+  function pasoEjercicio(a) {
+    if (!R || !R.activo) return;
+    var u = umbrales(), ex = R.ex, paso = ex.pasos[R.paso], prev = R.paso > 0 ? ex.pasos[R.paso - 1] : null;
+    if (a.ataque && a.ahora - R.ultimoAvance > 0.25) { R.ataqueDesdePaso = true; R.ataquePend = a.ahora; }
+    var oidasAntes = R.oidas.join(",");
+    if (ex.modo === "notas") {
+      var m = a.nota ? Math.round(a.nota.midi) : null;
+      R.oidas = m != null ? [m] : [];
+      $("ex-hear").textContent = m != null ? nombre(m) : "—";
+      if (m == null) { R.estable = 0; R.cand = null; }
+      else {
+        if (m === R.cand) R.estable++; else { R.cand = m; R.estable = 1; }
+        if (R.estable >= 2) {
+          var exacta = m === paso, octava = (m % 12) === (paso % 12) && Math.abs(m - paso) === 12;
+          var mismaQueAntes = prev != null && (prev % 12) === (paso % 12);
+          if ((exacta || octava) && (!mismaQueAntes || R.ataqueDesdePaso)) { avanzar(false); return; }
+          var esLaAnterior = prev != null && (m % 12) === (prev % 12);
+          if (R.ataquePend != null && (m % 12) !== (paso % 12) && !esLaAnterior) { marcarError(m, m % 12); R.ataquePend = null; }
+        }
+      }
+    } else {
+      var cr = a.cr;
+      if (!cr) { R.okFr = 0; R.oidas = []; $("ex-hear").textContent = "—"; }
+      else {
+        R.oidas = cr.notas.slice(0, 8);
+        var mj = cr.mejor;
+        $("ex-hear").textContent = mj.score > 0.45 ? nombreAcorde(mj.t.raiz, mj.t.cal) : (cr.notas.length ? cr.notas.slice(0, 4).map(nombre).join("-") : "—");
+        var pt = puntajeDe(cr, paso.raiz, paso.cal);
+        var ok = a.fuerte && pt.exp >= u.exp && pt.pres >= 0.12 && pt.score >= mj.score - 0.03;
+        var mismoQueAntes = prev != null && prev.raiz === paso.raiz && prev.cal === paso.cal;
+        if (ok && (!mismoQueAntes || R.ataqueDesdePaso)) { R.okFr++; if (R.okFr >= 2) { avanzar(false); return; } }
+        else R.okFr = 0;
+        if (!ok && R.ataquePend != null && a.ahora - R.ataquePend > 0.45) {
+          var otro = mj.score > 0.5 && !(mj.t.raiz === paso.raiz && mj.t.cal === paso.cal) && !(prev && mj.t.raiz === prev.raiz && mj.t.cal === prev.cal);
+          if (otro) { var raizMidi = cr.notas.filter(function (q) { return q % 12 === mj.t.raiz; })[0]; marcarError(raizMidi != null ? raizMidi : null, mj.t.raiz + mj.t.cal); }
+          R.ataquePend = null;
+        }
+      }
+    }
+    if (R.oidas.join(",") !== oidasAntes || R.errHasta > 0) pintarObjetivo();
+  }
+  function terminar(completo) {
+    var ex = R.ex, dur = Au.ac ? Au.ac.currentTime - R.inicio : 0;
+    detenerCorrida();
+    // dudas: pasos que llevaron más del doble de la mediana
+    var inter = [];
+    for (var i = 0; i < R.tiempos.length; i++) inter.push(R.tiempos[i] - (i ? R.tiempos[i - 1] : 0));
+    var interSinPrimero = inter.slice(1);
+    var med = interSinPrimero.slice().sort(function (a, b) { return a - b; })[Math.floor(interSinPrimero.length / 2)] || 0;
+    var dudas = [];
+    interSinPrimero.forEach(function (d, j) { if (med && d > med * 2 && d > 1.5) dudas.push(etiquetaPaso(ex.pasos[j + 1])); });
+    var pulso = null;
+    if (ex.pulso && interSinPrimero.length >= 3) {
+      var media = interSinPrimero.reduce(function (a, b) { return a + b; }, 0) / interSinPrimero.length;
+      var desv = Math.sqrt(interSinPrimero.reduce(function (a, b) { return a + (b - media) * (b - media); }, 0) / interSinPrimero.length);
+      pulso = { media: media, esperado: 4 * 60 / Met.bpm, cv: media ? desv / media : 0, bpm: Met.bpm };
+    }
+    var reg = { ex: ex.id, t: new Date().toISOString(), completo: completo, seg: Math.round(dur), errores: R.errores,
+                saltos: R.saltos.map(function (k) { return etiquetaPaso(ex.pasos[k]); }), dudas: dudas, pasos: R.paso, total: ex.pasos.length,
+                pulso: pulso, sens: sens };
+    var h = leerHist(); h.push(reg); guardarHist(h);
+    mostrarResultado(ex, reg);
+  }
+
+  // ---------- resultado ----------
+  function pulsoCorto(p) {
+    var dif = (p.media - p.esperado) / p.esperado;
+    var ritmo = Math.abs(dif) < 0.08 ? "a tiempo" : dif < 0 ? "apurado " + Math.round(-dif * 100) + "%" : "lento " + Math.round(dif * 100) + "%";
+    return "cada " + fmtNum(p.media, 1) + " s · " + ritmo + " · " + (p.cv < 0.12 ? "parejo" : p.cv < 0.25 ? "algo irregular" : "irregular");
+  }
+  function textoPulso(p) {
+    var dif = (p.media - p.esperado) / p.esperado;
+    var ritmo = Math.abs(dif) < 0.08 ? "a tiempo" : dif < 0 ? "te apuraste un " + Math.round(-dif * 100) + "%" : "fuiste un " + Math.round(dif * 100) + "% más lento";
+    var parejo = p.cv < 0.12 ? "parejo" : p.cv < 0.25 ? "algo irregular" : "irregular";
+    return "cambiaste de acorde cada " + fmtNum(p.media, 1) + " s (a " + p.bpm + " bpm, 4 golpes son " + fmtNum(p.esperado, 1) + " s): " + ritmo + ", " + parejo;
+  }
+  function mostrarResultado(ex, reg) {
+    $("res-ex").textContent = ex.titulo;
+    var limpio = reg.completo && reg.errores === 0 && reg.saltos.length === 0;
+    $("res-big").textContent = !reg.completo ? "Quedó por la mitad" : limpio ? "¡Salió limpio!" : "¡Salió!";
+    $("res-line").textContent = reg.completo
+      ? (limpio ? "Sin errores. Si te pasó dos veces seguidas, subí 5 bpm o pasá al siguiente." : "Lo terminaste. Mirá abajo dónde costó.")
+      : "Llegaste al paso " + reg.pasos + " de " + reg.total + ".";
+    var st = $("res-stats"); st.innerHTML = "";
+    function fila(k, v) { var r = el("div", "stat"); r.appendChild(el("span", null, k)); r.appendChild(el("b", null, v)); st.appendChild(r); }
+    fila("Tiempo", fmtSeg(reg.seg));
+    fila("Errores", String(reg.errores));
+    if (reg.saltos.length) fila("Pasos saltados", reg.saltos.join(", "));
+    fila("Dudas", reg.dudas.length ? reg.dudas.join(", ") : "ninguna");
+    if (reg.pulso) fila("Pulso", pulsoCorto(reg.pulso));
+    var antes = leerHist().filter(function (x) { return x.ex === ex.id && x.completo; });
+    fila("Veces que salió", String(antes.length));
+    var lineas = [
+      "Piano en vivo — " + ex.titulo + " — " + new Date(reg.t).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }),
+      (reg.completo ? "Completo" : "Incompleto (" + reg.pasos + " de " + reg.total + ")") + " · tiempo " + fmtSeg(reg.seg) + " · errores " + reg.errores +
+        (reg.saltos.length ? " · saltados: " + reg.saltos.join(", ") : ""),
+      "Dudas: " + (reg.dudas.length ? reg.dudas.join(", ") : "ninguna")
+    ];
+    if (reg.pulso) lineas.push("Pulso: " + textoPulso(reg.pulso));
+    lineas.push("Veces que salió: " + antes.length + " · sensibilidad " + reg.sens);
+    $("res-summary").value = lineas.join("\n");
+    $("res-status").textContent = "";
+    mostrar("res");
+  }
+  $("res-copy").addEventListener("click", function () {
+    var t = $("res-summary").value;
+    var ok = function () { $("res-status").textContent = "Copiado. Pegáselo a Jane en el chat."; };
+    var manual = function () { $("res-summary").focus(); $("res-summary").select(); $("res-status").textContent = "Seleccioné el texto: tocá Copiar en el menú."; };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok, manual); else manual();
+  });
+  $("res-again").addEventListener("click", function () { if (R) abrirEjercicio(R.ex); });
+
+  // ---------- modo libre ----------
+  var L = { estable: 0, cand: null, acorde: null, acEst: 0 };
+  function pasoLibre(a) {
+    var notaTxt = "—", acTxt = "—", oidas = [];
+    if (a.nota) { var m = Math.round(a.nota.midi); notaTxt = nombreNota(m); oidas = [m]; }
+    if (a.cr && a.fuerte) {
+      var mj = a.cr.mejor, u = umbrales();
+      if (mj.exp >= u.exp && mj.pres >= 0.12) acTxt = nombreAcorde(mj.t.raiz, mj.t.cal);
+      if (a.cr.notas.length > 1) oidas = a.cr.notas.slice(0, 8);
+    }
+    $("l-note").textContent = notaTxt;
+    $("l-chord").textContent = acTxt;
+    teclado($("l-kb"), 48, 83, {}, oidas, null, []);
+  }
+  $("l-start").addEventListener("click", function () {
+    if (Esc.modo === "libre") { Esc.modo = null; $("l-start").textContent = "Escuchar"; $("l-status").textContent = ""; soltarPantalla(); return; }
+    if (!crearContexto()) { errorMic(new Error("sin-audio"), "l-status"); return; }
+    $("l-status").textContent = "Pidiendo el micrófono…";
+    abrirMicrofono().then(function () {
+      $("l-status").textContent = "Un segundo en silencio…";
+      calibrar(function () {
+        Esc.modo = "libre"; arrancarBucle(); pedirPantalla();
+        $("l-start").textContent = "Dejar de escuchar";
+        $("l-status").textContent = "Te escucho.";
+      });
+    }).catch(function (e) { errorMic(e, "l-status"); });
+  });
+
+  // ---------- avance ----------
+  function pintarAvance() {
+    var box = $("av-list"), h = leerHist(); box.innerHTML = "";
+    EX.forEach(function (ex) {
+      var hs = h.filter(function (x) { return x.ex === ex.id; });
+      var ok = hs.filter(function (x) { return x.completo; });
+      var row = el("div", "hist-row");
+      row.appendChild(el("h3", null, ex.titulo));
+      if (!hs.length) { row.appendChild(el("span", "small muted", "Todavía no lo probaste.")); box.appendChild(row); return; }
+      var mejor = ok.slice().sort(function (a, b) { return (a.errores - b.errores) || (a.seg - b.seg); })[0];
+      var ult = hs[hs.length - 1];
+      var txt = "Salió " + ok.length + (ok.length === 1 ? " vez" : " veces");
+      if (mejor) txt += " · mejor: " + mejor.errores + (mejor.errores === 1 ? " error" : " errores") + " en " + fmtSeg(mejor.seg);
+      txt += " · última: " + hace(ult.t);
+      row.appendChild(el("span", "small muted", txt));
+      box.appendChild(row);
+    });
+  }
+
+  // ---------- inicio ----------
+  function pintarInicio() {
+    var box = $("home-groups"), h = leerHist(); box.innerHTML = "";
+    var grupos = [];
+    EX.forEach(function (ex) { if (grupos.indexOf(ex.grupo) < 0) grupos.push(ex.grupo); });
+    grupos.forEach(function (g) {
+      var sec = el("div", "group"); sec.appendChild(el("h2", null, g));
+      var cards = el("div", "cards");
+      EX.filter(function (ex) { return ex.grupo === g; }).forEach(function (ex) {
+        var b = el("button", "card"); b.type = "button";
+        var r1 = el("div", "row1");
+        r1.appendChild(el("span", null)).appendChild(el("h3", null, ex.titulo));
+        r1.appendChild(el("span", "tag " + MANO[ex.mano][1], MANO[ex.mano][0]));
+        b.appendChild(r1);
+        var hs = h.filter(function (x) { return x.ex === ex.id; });
+        var ult = hs[hs.length - 1];
+        b.appendChild(el("span", "last", ult ? (ult.completo ? "Salió " : "Quedó por la mitad ") + hace(ult.t) + " · " + ult.errores + (ult.errores === 1 ? " error" : " errores") : ex.ayuda));
+        b.addEventListener("click", function () { abrirEjercicio(ex); });
+        cards.appendChild(b);
+      });
+      sec.appendChild(cards);
+      box.appendChild(sec);
+    });
+  }
+
+  // ---------- pantalla encendida ----------
+  var lock = null;
+  function pedirPantalla() { if (navigator.wakeLock && navigator.wakeLock.request && !lock) navigator.wakeLock.request("screen").then(function (l) { lock = l; }).catch(function () {}); }
+  function soltarPantalla() { if (lock) { lock.release().catch(function () {}); lock = null; } }
+  document.addEventListener("visibilitychange", function () { if (!document.hidden && Esc.modo) { lock = null; pedirPantalla(); } });
+
+  // ---------- eventos ----------
+  $("ex-start").addEventListener("click", empezarCorrida);
+  $("ex-skip").addEventListener("click", function () { if (R && R.activo) avanzar(true); });
+  document.querySelectorAll("[data-back]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      detenerCorrida();
+      if (Esc.modo === "libre") { Esc.modo = null; $("l-start").textContent = "Escuchar"; }
+      pintarInicio(); mostrar("home");
+    });
+  });
+  $("go-libre").addEventListener("click", function () { teclado($("l-kb"), 48, 83, {}, [], null, []); mostrar("libre"); });
+  $("go-avance").addEventListener("click", function () { pintarAvance(); mostrar("avance"); });
+  function setSens(v) {
+    sens = v; $("sens").value = v; $("sens2").value = v; $("sens-val").textContent = v; $("sens2-val").textContent = v;
+    try { localStorage.setItem(SKEY, String(v)); } catch (e) {}
+  }
+  $("sens").addEventListener("input", function () { setSens(parseInt(this.value, 10)); });
+  $("sens2").addEventListener("input", function () { setSens(parseInt(this.value, 10)); });
+  $("m-down").addEventListener("click", function () { Met.bpm = Math.max(40, Met.bpm - 5); $("m-bpm").textContent = Met.bpm; });
+  $("m-up").addEventListener("click", function () { Met.bpm = Math.min(120, Met.bpm + 5); $("m-bpm").textContent = Met.bpm; });
+  $("m-toggle").addEventListener("click", function () { Met.on ? metroApagar() : metroEncender(); });
+
+  setSens(sens);
+  pintarInicio();
+  // para pruebas automáticas
+  window.__pcj = { EX: EX, estado: function () { return R ? { paso: R.paso, errores: R.errores, activo: R.activo, vista: vistaActual } : null; } };
+})();
+</script>
+</body>
+</html>
