@@ -88,8 +88,9 @@ header.top { display: grid; gap: 4px; padding-top: 6px; }
 .target .big { font-family: var(--font-display); font-weight: 800; font-size: 2.6rem; line-height: 1.05; }
 .target .sub { color: var(--muted); }
 .flash-ok .big { color: var(--ok); }
-.meter { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
-.meter i { display: block; height: 100%; width: 0%; background: var(--lh); transition: width 60ms linear; }
+.meter { position: relative; height: 10px; border-radius: 999px; background: var(--line); }
+.meter i { display: block; height: 100%; width: 0%; border-radius: 999px; background: var(--lh); transition: width 60ms linear; }
+.meter b { position: absolute; top: -4px; bottom: -4px; width: 3px; margin-left: -1px; border-radius: 2px; background: var(--felt); left: 0; }
 .hear { display: flex; justify-content: space-between; gap: 10px; font-size: 0.9rem; color: var(--muted); }
 .hear b { color: var(--ink); }
 .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
@@ -160,7 +161,7 @@ ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
         <span class="sub" id="ex-sub">Tocá «Empezar» y dejá que el micrófono escuche.</span>
       </div>
       <div class="kb" id="ex-kb"></div>
-      <div class="meter" aria-hidden="true"><i id="ex-meter"></i></div>
+      <div class="meter" aria-hidden="true"><i id="ex-meter"></i><b id="ex-umbral"></b></div>
       <div class="hear"><span>Escucho: <b id="ex-hear">—</b></span><span id="ex-count"></span></div>
     </div>
     <div class="metro" id="ex-metro" hidden>
@@ -180,7 +181,7 @@ ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
       <div class="range">
         <label for="sens" class="small">Sensibilidad: <b id="sens-val">5</b> de 10</label>
         <input type="range" id="sens" min="1" max="10" step="1" value="5">
-        <p class="small muted">Si no reacciona cuando tocás, subila. Si avanza sola o marca errores que no hiciste, bajala. Probala en «Probar el micrófono».</p>
+        <p class="small muted">La barra azul es lo que me llega; la rayita roja, desde dónde escucho. Si al tocar la barra no pasa la rayita, acercá el celu o subí la sensibilidad. Si avanza sola o marca errores que no hiciste, bajala.</p>
       </div>
     </details>
   </section>
@@ -219,7 +220,7 @@ ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
         <span class="eyebrow">Acorde</span><span class="big" id="l-chord" style="font-size:2rem">—</span>
       </div>
       <div class="kb" id="l-kb"></div>
-      <div class="meter" aria-hidden="true"><i id="l-meter"></i></div>
+      <div class="meter" aria-hidden="true"><i id="l-meter"></i><b id="l-umbral"></b></div>
     </div>
     <div class="controls"><button class="btn primary" type="button" id="l-start">Escuchar</button></div>
     <p class="status" id="l-status" aria-live="polite"></p>
@@ -399,18 +400,32 @@ ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
       if (!AC) return false;
       Au.ac = new AC();
     }
-    if (Au.ac.state === "suspended") Au.ac.resume();
+    if (Au.ac.state !== "running") Au.ac.resume();          // "suspended" o "interrupted" (iPhone)
     return true;
   }
+  // El iPhone corta el micrófono cuando la página pasa a segundo plano: hay que volver a abrirlo.
+  function micVivo() {
+    if (!Au.listo || !Au.stream) return false;
+    var tr = Au.stream.getAudioTracks()[0];
+    return !!tr && tr.readyState === "live" && !tr.muted;
+  }
+  function cerrarMicrofono() {
+    if (Au.stream) { try { Au.stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {} }
+    if (Au.src) { try { Au.src.disconnect(); } catch (e) {} }
+    Au.stream = null; Au.src = null; Au.listo = false;
+  }
   function abrirMicrofono() {
-    if (Au.listo) return Promise.resolve(true);
     if (!crearContexto()) return Promise.reject(new Error("sin-audio"));
+    if (micVivo()) return Promise.resolve(true);
+    cerrarMicrofono();
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return Promise.reject(new Error("sin-mic"));
     return navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false })
       .then(function (stream) {
         Au.stream = stream;
         Au.sr = Au.ac.sampleRate;
+        stream.getAudioTracks().forEach(function (tr) { tr.addEventListener("ended", function () { Au.listo = false; }); });
         var src = Au.ac.createMediaStreamSource(stream);
+        Au.src = src;
         Au.an = Au.ac.createAnalyser();
         Au.an.fftSize = 16384;
         Au.an.smoothingTimeConstant = 0;
@@ -424,7 +439,7 @@ ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
 
   // YIN: la nota que más suena (para ejercicios de notas sueltas)
   var yinD = null, yinC = null;
-  function yin(buf, inicio, sr) {
+  function yin(buf, inicio, sr, umbral) {
     var W = 2048, tauMin = Math.floor(sr / 1100), tauMax = Math.min(Math.floor(sr / 60), buf.length - inicio - W - 1);
     if (!yinD || yinD.length < tauMax + 1) { yinD = new Float32Array(tauMax + 1); yinC = new Float32Array(tauMax + 1); }
     for (var tau = 1; tau <= tauMax; tau++) {
@@ -434,7 +449,7 @@ ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
     }
     yinC[0] = 1; var acum = 0;
     for (var t2 = 1; t2 <= tauMax; t2++) { acum += yinD[t2]; yinC[t2] = acum > 0 ? yinD[t2] * t2 / acum : 1; }
-    var umbral = 0.15, mejor = -1;
+    var mejor = -1;
     for (var t = tauMin; t <= tauMax; t++) {
       if (yinC[t] < umbral) { while (t + 1 <= tauMax && yinC[t + 1] < yinC[t]) t++; mejor = t; break; }
     }
@@ -448,7 +463,7 @@ ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
   // Croma: qué notas (sin octava) suenan, a partir de los picos del espectro entre 60 y 720 Hz
   var TRIADAS = [];
   for (var r0 = 0; r0 < 12; r0++) { TRIADAS.push({ raiz: r0, cal: "M", pcs: pcsAcorde(r0, "M") }); TRIADAS.push({ raiz: r0, cal: "m", pcs: pcsAcorde(r0, "m") }); }
-  function croma(fd, sr, nfft) {
+  function croma(fd, sr, nfft, sobrePiso) {
     var bin = sr / nfft, kmin = Math.ceil(60 / bin), kmax = Math.floor(720 / bin);
     var ch = new Float32Array(12), picos = [], tot = 0, mags = [], k;
     for (k = kmin; k <= kmax; k++) mags.push(fd[k]);
@@ -456,7 +471,7 @@ ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
     var piso = orden[Math.floor(orden.length * 0.5)];            // mediana en dB
     for (k = kmin + 1; k < kmax; k++) {
       var a = fd[k - 1], b = fd[k], c = fd[k + 1];
-      if (b > a && b >= c && b > piso + 18) {
+      if (b > a && b >= c && b > piso + sobrePiso) {
         var den = a - 2 * b + c, p = den !== 0 ? 0.5 * (a - c) / den : 0;
         var f = (k + p) * bin, midi = 69 + 12 * Math.log2(f / 440), mr = Math.round(midi);
         if (Math.abs(midi - mr) > 0.38) continue;
@@ -490,9 +505,10 @@ ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
   // sensibilidad → umbrales
   function umbrales() {
     return {
-      rms: Math.max(0.03 * Math.pow(0.68, sens - 1), ruido * 3),
+      rms: Math.max(0.03 * Math.pow(0.68, sens - 1), ruido * (3 - (sens - 1) * 0.15)),
       exp: 0.70 - (sens - 1) * 0.03,
-      conf: 0.80
+      yin: 0.10 + sens * 0.015,           // 5 → 0,175 · 10 → 0,25
+      pico: 24 - (sens - 1) * 1.5         // dB sobre el piso: 5 → 18 · 10 → 10,5
     };
   }
 
@@ -537,7 +553,7 @@ ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
   }
 
   // ---------- bucle de escucha ----------
-  var ruido = 0, histRms = [], ultimoAtaque = -1, bucle = null;
+  var ruido = 0, histRms = [], ultimoAtaque = -1, bucle = null, silencio = 0;
   var Esc = { activo: false, modo: null };   // quién está usando el micrófono: "ex" | "libre"
   function analizar() {
     Au.an.getFloatTimeDomainData(Au.td);
@@ -553,10 +569,20 @@ ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
     histRms.push(rms); if (histRms.length > 12) histRms.shift();
     var res = { rms: rms, ataque: ataque, ahora: ahora, nota: null, cr: null, fuerte: rms > u.rms };
     if (res.fuerte && !cercaDeClick(ahora)) {
-      var y = yin(Au.td, n - 4096, Au.sr);
-      if (y && y.conf >= u.conf && y.midi > 30 && y.midi < 100) res.nota = y;
+      var y = yin(Au.td, n - 4096, Au.sr, u.yin);
+      if (y && y.midi > 30 && y.midi < 100) res.nota = y;
       Au.an.getFloatFrequencyData(Au.fd);
-      res.cr = croma(Au.fd, Au.sr, Au.an.fftSize);
+      res.cr = croma(Au.fd, Au.sr, Au.an.fftSize, u.pico);
+      // si YIN no encontró la nota, la saco del espectro: la nota (sin octava) que más suena
+      if (!res.nota && res.cr && res.cr.tot > 0) {
+        var ch = res.cr.ch, i1 = 0, v2 = 0;
+        for (var k = 1; k < 12; k++) if (ch[k] > ch[i1]) i1 = k;
+        for (var k2 = 0; k2 < 12; k2++) if (k2 !== i1 && ch[k2] > v2) v2 = ch[k2];
+        if (ch[i1] >= v2 * 1.6) {
+          var oct = res.cr.notas.filter(function (q) { return ((q % 12) + 12) % 12 === i1; });
+          res.nota = { midi: oct.length ? Math.min.apply(null, oct) : 60 + i1, conf: 0.5, espectro: true };
+        }
+      }
     }
     return res;
   }
@@ -566,8 +592,11 @@ ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
       if (!Au.listo || document.hidden) return;
       var a = analizar();
       var pct = Math.min(100, Math.round(Math.sqrt(a.rms / 0.2) * 100));
-      if (Esc.modo === "ex") { $("ex-meter").style.width = pct + "%"; pasoEjercicio(a); }
-      else if (Esc.modo === "libre") { $("l-meter").style.width = pct + "%"; pasoLibre(a); }
+      var pu = Math.min(100, Math.round(Math.sqrt(umbrales().rms / 0.2) * 100));
+      silencio = a.rms < 1e-6 ? silencio + 1 : 0;
+      if (silencio === 45 && Esc.modo) micCortado();
+      if (Esc.modo === "ex") { $("ex-meter").style.width = pct + "%"; $("ex-umbral").style.left = pu + "%"; pasoEjercicio(a); }
+      else if (Esc.modo === "libre") { $("l-meter").style.width = pct + "%"; $("l-umbral").style.left = pu + "%"; pasoLibre(a); }
     }, 45);
   }
   function calibrar(cb) {
@@ -645,13 +674,23 @@ ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
     teclado($("ex-kb"), rg[0], rg[1], marcas, R.oidas, err, etiquetas);
   }
   function empezarCorrida() {
-    var ex = R.ex;
+    var ex = R.ex, seguir = R.pausa != null && R.paso > 0 && R.paso < ex.pasos.length;
     if (!crearContexto()) { errorMic(new Error("sin-audio"), "ex-status"); return; }
     $("ex-status").textContent = "Pidiendo el micrófono…";
     abrirMicrofono().then(function () {
       $("ex-status").textContent = "Un segundo en silencio: estoy midiendo el ruido de la sala…";
       $("ex-start").disabled = true;
       calibrar(function () {
+        if (seguir) {                          // retoma donde quedó, sin contar la pausa
+          R.inicio += Au.ac.currentTime - R.pausa; R.pausa = null;
+          R.activo = true; R.estable = 0; R.okFr = 0; R.cand = null; R.ataquePend = null;
+          Esc.modo = "ex"; arrancarBucle(); pedirPantalla();
+          $("ex-start").disabled = false; $("ex-start").textContent = "Reiniciar";
+          $("ex-skip").disabled = false;
+          $("ex-status").textContent = "Te escucho de nuevo. Seguí desde " + etiquetaPaso(ex.pasos[R.paso]) + ".";
+          mostrarObjetivoTexto();
+          return;
+        }
         abrirEjercicio(ex);                    // limpia la corrida
         R.activo = true; R.inicio = Au.ac.currentTime;
         Esc.modo = "ex"; arrancarBucle(); pedirPantalla();
@@ -673,6 +712,22 @@ ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
       if (p.lh.length) txt += " · izq. " + p.lh.map(nombre).join("-");
       $("ex-sub").textContent = txt + " · paso " + (R.paso + 1) + " de " + R.ex.pasos.length;
     }
+  }
+  // pausa: el micrófono se cortó o la página pasó a segundo plano
+  function pausarCorrida(msg) {
+    if (!R || !R.activo) return;
+    R.activo = false; R.pausa = Au.ac ? Au.ac.currentTime : 0;
+    if (Esc.modo === "ex") Esc.modo = null;
+    if (Met.on) metroApagar();
+    soltarPantalla();
+    $("ex-start").textContent = R.paso > 0 ? "Seguir" : "Empezar";
+    $("ex-skip").disabled = true;
+    $("ex-status").textContent = msg;
+  }
+  function micCortado() {
+    Au.listo = false;                          // obliga a reabrirlo en el próximo toque
+    if (Esc.modo === "ex") pausarCorrida("No me llega sonido del micrófono. Tocá «" + (R && R.paso > 0 ? "Seguir" : "Empezar") + "» para volver a abrirlo.");
+    else if (Esc.modo === "libre") { Esc.modo = null; soltarPantalla(); $("l-start").textContent = "Escuchar"; $("l-status").textContent = "No me llega sonido del micrófono. Tocá «Escuchar» para volver a abrirlo."; }
   }
   function detenerCorrida() {
     if (R) R.activo = false;
@@ -714,11 +769,11 @@ ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
       else {
         if (m === R.cand) R.estable++; else { R.cand = m; R.estable = 1; }
         if (R.estable >= 2) {
-          var exacta = m === paso, octava = (m % 12) === (paso % 12) && Math.abs(m - paso) === 12;
+          var exacta = m === paso, octava = (m % 12) === (paso % 12);
           var mismaQueAntes = prev != null && (prev % 12) === (paso % 12);
           if ((exacta || octava) && (!mismaQueAntes || R.ataqueDesdePaso)) { avanzar(false); return; }
           var esLaAnterior = prev != null && (m % 12) === (prev % 12);
-          if (R.ataquePend != null && (m % 12) !== (paso % 12) && !esLaAnterior) { marcarError(m, m % 12); R.ataquePend = null; }
+          if (R.ataquePend != null && (m % 12) !== (paso % 12) && !esLaAnterior && a.rms > u.rms * 2) { marcarError(m, m % 12); R.ataquePend = null; }
         }
       }
     } else {
@@ -735,7 +790,7 @@ ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
         else R.okFr = 0;
         if (!ok && R.ataquePend != null && a.ahora - R.ataquePend > 0.45) {
           var otro = mj.score > 0.5 && !(mj.t.raiz === paso.raiz && mj.t.cal === paso.cal) && !(prev && mj.t.raiz === prev.raiz && mj.t.cal === prev.cal);
-          if (otro) { var raizMidi = cr.notas.filter(function (q) { return q % 12 === mj.t.raiz; })[0]; marcarError(raizMidi != null ? raizMidi : null, mj.t.raiz + mj.t.cal); }
+          if (otro && a.rms > u.rms * 2) { var raizMidi = cr.notas.filter(function (q) { return q % 12 === mj.t.raiz; })[0]; marcarError(raizMidi != null ? raizMidi : null, mj.t.raiz + mj.t.cal); }
           R.ataquePend = null;
         }
       }
@@ -889,7 +944,14 @@ ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
   var lock = null;
   function pedirPantalla() { if (navigator.wakeLock && navigator.wakeLock.request && !lock) navigator.wakeLock.request("screen").then(function (l) { lock = l; }).catch(function () {}); }
   function soltarPantalla() { if (lock) { lock.release().catch(function () {}); lock = null; } }
-  document.addEventListener("visibilitychange", function () { if (!document.hidden && Esc.modo) { lock = null; pedirPantalla(); } });
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) {
+      // al salir de Safari el iPhone corta el micrófono: pausamos y al volver se reabre con un toque
+      if (Esc.modo === "ex") pausarCorrida("Pausado mientras estabas fuera. Tocá «" + (R && R.paso > 0 ? "Seguir" : "Empezar") + "» para que te vuelva a escuchar.");
+      else if (Esc.modo === "libre") { Esc.modo = null; soltarPantalla(); $("l-start").textContent = "Escuchar"; $("l-status").textContent = "Pausado mientras estabas fuera. Tocá «Escuchar»."; }
+      Au.listo = false;
+    }
+  });
 
   // ---------- eventos ----------
   $("ex-start").addEventListener("click", empezarCorrida);
@@ -916,7 +978,7 @@ ul.plain { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
   setSens(sens);
   pintarInicio();
   // para pruebas automáticas
-  window.__pcj = { EX: EX, estado: function () { return R ? { paso: R.paso, errores: R.errores, activo: R.activo, vista: vistaActual } : null; } };
+  window.__pcj = { EX: EX, au: Au, estado: function () { return R ? { paso: R.paso, errores: R.errores, activo: R.activo, vista: vistaActual } : null; } };
 })();
 </script>
 </body>
